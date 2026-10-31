@@ -123,9 +123,13 @@ export function createBackend() {
       }
     },
 
-    async add() {
-      await request('/api/features', { method: 'POST', body: JSON.stringify({}) })
+    async add(fields = {}) {
+      const feature = await request('/api/features', {
+        method: 'POST',
+        body: JSON.stringify(fields),
+      })
       await Promise.all([...rowListeners].map((reload) => reload()))
+      return feature
     },
 
     async update(id, field, value) {
@@ -139,6 +143,17 @@ export function createBackend() {
     async remove(id) {
       await request(`/api/features/${encodeURIComponent(id)}`, { method: 'DELETE' })
       await Promise.all([...rowListeners].map((reload) => reload()))
+    },
+
+    async getConfig() {
+      return request('/api/config')
+    },
+
+    async parseWithAi(text, today) {
+      return request('/api/quick-add/ai', {
+        method: 'POST',
+        body: JSON.stringify({ text, today }),
+      })
     },
   }
 }
