@@ -211,6 +211,7 @@ export default function Dashboard({ rows, today, highlightId }) {
     ['Total features', stats.total, ''],
     ['In production', stats.inProduction, ''],
     ['Overdue', stats.overdue, 'danger'],
+    ['Doctors informed', stats.doctors.informed, ''],
     ['Doctors not informed', stats.doctors.notInformed, ''],
   ]
   return (

@@ -114,7 +114,7 @@ input:disabled, select:disabled, textarea:disabled { opacity: .65; }
 .alert-filter.selected { color: var(--ink); }
 
 .dashboard { display: grid; gap: 14px; }
-.stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.stats-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 .stat-card, .panel, .table-card {
   border: 1px solid var(--line);
   border-radius: 14px;
