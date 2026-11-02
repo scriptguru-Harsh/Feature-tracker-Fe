@@ -201,7 +201,7 @@ export default function App() {
             <p className="sub">Feature progress, deadlines and doctor communication.</p>
           </div>
           <div className="header-actions">
-            <button className="btn pri quick-open" disabled={!ready} onClick={() => setQuickAddOpen(true)}>+ Quick add</button>
+            <button className="btn pri quick-open" disabled={!ready} onClick={() => setQuickAddOpen(true)}>+ Add feature</button>
             <span className="account-email">{user.email}</span>
             <button className="btn" disabled={busy} onClick={signOut}>Sign out</button>
           </div>
@@ -235,7 +235,8 @@ export default function App() {
 
       <p className="app-status" role="status">{message}</p>
       {error && <p className="warn app-error" role="alert">{error}</p>}
-      {quickAddOpen && <QuickAdd backend={backend} aiAvailable={aiAvailable} onClose={() => setQuickAddOpen(false)} onAdd={addDraft} />}
+      {quickAddOpen && <QuickAdd backend={backend} aiAvailable={aiAvailable} rows={rows}
+        onClose={() => setQuickAddOpen(false)} onAdd={addDraft} />}
     </main>
   )
 }

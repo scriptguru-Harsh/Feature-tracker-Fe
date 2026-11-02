@@ -24,13 +24,20 @@ The API must allow the frontend's origin in its `CORS_ORIGIN` setting.
   toggle apply to both views.
 - **Table** retains the editable feature sheet and adds deadline, priority and
   computed alert columns.
-- **Quick add** parses one feature per line using a local rule-based parser.
-  Adding a draft always requires pressing **Add to tracker**.
+- **Add feature** opens a guided form by default. Doctor, clinic, and assignee
+  inputs suggest values already used in the tracker. **Describe it** remains
+  available for one or more plain-text feature drafts.
+- Adding a text draft always requires pressing **Add to tracker**.
 - Alert rules: an undelivered feature is overdue when its deadline is before
   today, due soon when it is due in 0–3 days, blocked when development is
   Blocked or testing Failed, and high priority when priority is High. Delivered
   means development Done, testing Passed, deployment Production, and doctor
   informed or communication Not Required.
+
+  The deadline timeline uses a calendar-day window from 7 days before today
+  through 28 days after today. It labels overdue, near-term, later, earlier, and
+  out-of-window items separately; overlapping labels are assigned to different
+  lanes.
 
 The new fields are `deadline` (`YYYY-MM-DD` or null) and `priority` (`Normal` or
 `High`, default Normal). The API service applies its PostgreSQL migration at
@@ -45,6 +52,14 @@ ALTER TABLE public.features
 
 This checkout currently includes only the API backend adapter; Supabase and
 Firebase adapters are not present in the workspace.
+
+The API also seeds the 25 feature requests visible in the provided spreadsheet
+image once, using a migration marker. It creates new rows without replacing or
+editing existing tracker entries. Completed spreadsheet requests map to Done,
+Passed, and Production; trial work maps to In Review, In Testing, and Staging;
+the assigned teammate maps to Lead. Spreadsheet remarks and any dates that
+could not be represented as valid calendar dates remain in Notes. The
+“before Diwali” deadline is mapped to November 8, 2026.
 
 ## Optional smart parsing
 

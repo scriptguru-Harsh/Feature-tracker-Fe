@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { getAlert, sortByUrgency } from '../lib/alerts.js'
 import { getJourneySteps, getStats } from '../lib/stats.js'
+import { getTimeline, timelineDateLabel, timelineTickLabel } from '../lib/timeline.js'
 
 const STEP_LABELS = [
   ['build', 'Build'], ['test', 'Test'], ['staging', 'Staging'], ['live', 'Live'], ['doctor', 'Doctor told'],
@@ -155,78 +156,44 @@ function Journey({ rows, today, highlightId }) {
   )
 }
 
-function dateText(date) {
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
-
 function Timeline({ rows, today }) {
-  const current = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const start = new Date(current)
-  start.setDate(start.getDate() - 7)
-  const end = new Date(current)
-  end.setDate(end.getDate() + 28)
-  const toDate = (value) => {
-    const [year, month, day] = value.split('-').map(Number)
-    return new Date(year, month - 1, day)
-  }
-  const all = rows
-    .filter((feature) => feature.deadline && !getAlert(feature, today).delivered)
-    .map((feature) => ({ feature, date: toDate(feature.deadline), alert: getAlert(feature, today) }))
-  const earlier = all.filter((item) => item.date < start).length
-  const later = all.filter((item) => item.date > end).length
-  const visible = sortByUrgency(all.filter((item) => item.date >= start && item.date <= end).map((item) => item.feature), today)
-    .slice(0, 12)
-    .map((feature) => all.find((item) => item.feature.id === feature.id))
-  const omitted = Math.max(0, all.filter((item) => item.date >= start && item.date <= end).length - visible.length)
-  const span = (end.getTime() - start.getTime())
-  const markers = []
-  const laneEnds = []
-  for (const item of visible) {
-    const x = ((item.date.getTime() - start.getTime()) / span) * 100
-    let lane = laneEnds.findIndex((lastX) => x - lastX >= 27)
-    if (lane < 0) lane = laneEnds.length
-    laneEnds[lane] = x
-    const status = item.alert.overdue ? 'overdue' : item.alert.dueSoon ? 'soon' : 'later'
-    markers.push({ ...item, x, lane, status })
-  }
-  const ticks = Array.from({ length: 6 }, (_, index) => {
-    const date = new Date(start)
-    date.setDate(start.getDate() + index * 7)
-    return { date, x: (date.getTime() - start.getTime()) / span * 100 }
-  })
+  const timeline = getTimeline(rows, today)
 
   return (
     <section className="panel timeline-panel">
       <div className="panel-heading">
         <h2>Deadline timeline <span>· next 4 weeks</span></h2>
-        <span className="timeline-range">{dateText(start)} — {dateText(end)}</span>
+        <span className="timeline-range">{timelineDateLabel(timeline.start)} — {timelineDateLabel(timeline.end)}</span>
       </div>
       <div className="timeline-scroll">
-        <div className="timeline-chart" style={{ height: `${Math.max(112, laneEnds.length * 38 + 66)}px` }}>
+        <div className="timeline-chart" style={{ height: `${Math.max(112, timeline.laneCount * 38 + 66)}px` }}>
           <div className="timeline-overdue-zone" />
-          {ticks.map(({ date, x }, index) => (
-            <div className="timeline-tick" key={date.toISOString()} style={{ left: `${x}%` }}>
-              <span>{index === 0 ? '−7d' : index === 1 ? 'Today' : dateText(date)}</span>
+          {timeline.ticks.map(({ day, date, x }) => (
+            <div className="timeline-tick" key={day} style={{ left: `${x}%` }}>
+              <span>{timelineTickLabel(date, timeline.today)}</span>
             </div>
           ))}
-          <div className="timeline-today" style={{ left: `${7 / 35 * 100}%` }}>
-            <b>Today · {dateText(current)}</b>
+          <div className="timeline-today" style={{ left: `${timeline.todayX}%` }}>
+            <b>Today · {timelineDateLabel(timeline.today)}</b>
           </div>
-          {markers.map(({ feature, x, lane, status, alert }) => (
+          {timeline.markers.map(({ feature, x, lane, status, alert, labelSide }) => (
             <div className={`timeline-marker marker-${status}`} key={feature.id}
-              style={{ left: `${x}%`, top: `${8 + lane * 38}px` }} title={`${feature.name} · ${alert.label || dateText(toDate(feature.deadline))}`}>
+              style={{ left: `${x}%`, top: `${8 + lane * 38}px` }}
+              title={`${feature.name} · ${alert.label || timelineDateLabel(new Date(`${feature.deadline}T00:00:00Z`))}`}>
               <i />
-              <span>{feature.name} · {alert.overdue ? `${alert.daysLate}d late` : dateText(toDate(feature.deadline))}</span>
+              <span className={`timeline-marker-label label-${labelSide}`}>
+                {feature.name} · {alert.overdue ? `${alert.daysLate}d late` : timelineDateLabel(new Date(`${feature.deadline}T00:00:00Z`))}
+              </span>
             </div>
           ))}
-          {!markers.length && <p className="timeline-empty">No deadlines in this window.</p>}
+          {!timeline.markers.length && <p className="timeline-empty">No upcoming deadlines in this window.</p>}
         </div>
       </div>
-      {(earlier || later || omitted) > 0 && (
+      {(timeline.earlier || timeline.later || timeline.omitted) > 0 && (
         <p className="timeline-foot">
-          {earlier > 0 && <span>+{earlier} earlier</span>}
-          {later > 0 && <span>+{later} later</span>}
-          {omitted > 0 && <span>+{omitted} more in this window</span>}
+          {timeline.earlier > 0 && <span>+{timeline.earlier} earlier</span>}
+          {timeline.later > 0 && <span>+{timeline.later} later</span>}
+          {timeline.omitted > 0 && <span>+{timeline.omitted} more in this window</span>}
         </p>
       )}
       <div className="timeline-legend">

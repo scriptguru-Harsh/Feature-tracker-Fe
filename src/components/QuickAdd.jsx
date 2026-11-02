@@ -14,6 +14,20 @@ const FIELD_ROWS = [
   ['Doctor informed', 'inf'], ['Credentials', 'cred'], ['Lead', 'lead'], ['Notes', 'notes'],
 ]
 const FIELD_OPTIONS = { dev: DEV, test: TEST, dep: DEP, inf: INF, cred: CRED, priority: PRIORITY }
+const NEW_FEATURE = {
+  name: '',
+  by: '',
+  clinic: '',
+  deadline: '',
+  priority: 'Normal',
+  dev: 'Not Started',
+  test: 'Not Started',
+  dep: 'Not Deployed',
+  inf: 'Not Informed',
+  cred: 'Not Set',
+  lead: '',
+  notes: '',
+}
 
 function todayString(today) {
   return [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'), String(today.getDate()).padStart(2, '0')].join('-')
@@ -36,6 +50,99 @@ function dueNote(draft, today) {
   if (alert.overdue) return 'This is already overdue.'
   if (alert.daysLeft === 0) return 'Due today.'
   return `Due in ${alert.daysLeft} ${alert.daysLeft === 1 ? 'day' : 'days'}.`
+}
+
+function DirectEntryForm({ rows, onAdd }) {
+  const [values, setValues] = useState(NEW_FEATURE)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState('')
+  const [error, setError] = useState('')
+  const doctors = [...new Set(rows.map((row) => row.by).filter(Boolean))].sort()
+  const clinics = [...new Set(rows.map((row) => row.clinic).filter(Boolean))].sort()
+  const leads = [...new Set(rows.map((row) => row.lead).filter(Boolean))].sort()
+  const update = (field, value) => {
+    setValues((current) => ({ ...current, [field]: value }))
+    setError('')
+    setSaved('')
+  }
+  const submit = async (event) => {
+    event.preventDefault()
+    if (!values.name.trim()) {
+      setError('Add a feature name to continue.')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      await onAdd({ ...values, name: values.name.trim(), deadline: values.deadline || null })
+      setSaved(`Added “${values.name.trim()}”.`)
+      setValues(NEW_FEATURE)
+    } catch (failure) {
+      setError(failure?.message || 'Unable to save this feature. Try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+  const select = (field, label, options) => (
+    <label className="entry-field">
+      {label}
+      <select value={values[field]} onChange={(event) => update(field, event.target.value)}>
+        {options.map((option) => <option key={option}>{option}</option>)}
+      </select>
+    </label>
+  )
+
+  return (
+    <form className="direct-entry-form" onSubmit={submit}>
+      <div className="entry-intro">
+        <strong>Add a feature</strong>
+        <span>Enter the essentials now. You can update its progress later.</span>
+      </div>
+      <label className="entry-field entry-feature-name">
+        Feature name <span className="required-mark">Required</span>
+        <input autoFocus required maxLength={300} placeholder="e.g. Patient appointment reminders"
+          value={values.name} onChange={(event) => update('name', event.target.value)} />
+      </label>
+      <div className="entry-form-grid">
+        <label className="entry-field">
+          Requested by
+          <input list="quick-doctors" placeholder="Doctor name (optional)" value={values.by}
+            onChange={(event) => update('by', event.target.value)} />
+          <datalist id="quick-doctors">{doctors.map((value) => <option key={value} value={value} />)}</datalist>
+        </label>
+        <label className="entry-field">
+          Clinic
+          <input list="quick-clinics" placeholder="Clinic or client" value={values.clinic}
+            onChange={(event) => update('clinic', event.target.value)} />
+          <datalist id="quick-clinics">{clinics.map((value) => <option key={value} value={value} />)}</datalist>
+        </label>
+        <label className="entry-field">
+          Deadline
+          <input type="date" value={values.deadline} onChange={(event) => update('deadline', event.target.value)} />
+        </label>
+        {select('priority', 'Priority', PRIORITY)}
+        {select('dev', 'Development', DEV)}
+        {select('test', 'Testing', TEST)}
+        {select('dep', 'Deployment', DEP)}
+        {select('inf', 'Doctor informed', INF)}
+        {select('cred', 'Credentials', CRED)}
+        <label className="entry-field">
+          Assigned to
+          <input list="quick-leads" placeholder="Team member" value={values.lead}
+            onChange={(event) => update('lead', event.target.value)} />
+          <datalist id="quick-leads">{leads.map((value) => <option key={value} value={value} />)}</datalist>
+        </label>
+        <label className="entry-field entry-notes">
+          Notes
+          <textarea rows={3} maxLength={2000} placeholder="Extra context or next steps" value={values.notes}
+            onChange={(event) => update('notes', event.target.value)} />
+        </label>
+      </div>
+      {saved && <p className="entry-success" role="status">{saved}</p>}
+      {error && <p className="warn" role="alert">{error}</p>}
+      <button className="btn pri entry-submit" type="submit" disabled={saving}>{saving ? 'Adding…' : 'Add to tracker'}</button>
+    </form>
+  )
 }
 
 function FieldValue({ field, draft, found, editing, update }) {
@@ -127,7 +234,8 @@ function DraftCard({ item, today, onChange, onAdd, saving }) {
   )
 }
 
-export default function QuickAdd({ backend, aiAvailable, onClose, onAdd }) {
+export default function QuickAdd({ backend, aiAvailable, onClose, onAdd, rows }) {
+  const [mode, setMode] = useState('form')
   const [text, setText] = useState('')
   const [messages, setMessages] = useState([])
   const [drafts, setDrafts] = useState([])
@@ -211,24 +319,32 @@ export default function QuickAdd({ backend, aiAvailable, onClose, onAdd }) {
     <div className="quick-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <aside className="quick-panel" role="dialog" aria-modal="true" aria-labelledby="quick-title">
         <header className="quick-header">
-          <div><h2 id="quick-title">Quick add</h2><p>Describe a feature in plain language.</p></div>
+          <div><h2 id="quick-title">Add a feature</h2><p>Use the form or describe it in a sentence.</p></div>
           <button className="icon-btn" aria-label="Close quick add" onClick={onClose}>×</button>
         </header>
-        {aiAvailable && <label className="smart-toggle"><input type="checkbox" checked={smartParse} onChange={(event) => setSmartParse(event.target.checked)} /> Smart parse</label>}
-        <div className="quick-messages" ref={scrollRef}>
-          <div className="chat-tip">Try “Dark mode for the patient app, Dr Rao from Sunrise Clinic, needed by 5 Nov, urgent. It is on staging and in testing.”</div>
-          {messages.map((message) => <div className="chat-user" key={message.id}>{message.text}</div>)}
-          {usedBasic && <p className="basic-note">Used basic parsing.</p>}
-          {sending && <p className="chat-thinking">Parsing your feature…</p>}
-          {drafts.map((item) => (
-            <DraftCard key={item.id} item={item} today={today} onChange={updateDraft}
-              onAdd={(draft) => add(draft, item.id)} saving={savingId === item.id} />
-          ))}
+        <div className="entry-modes" role="tablist" aria-label="Add feature method">
+          <button type="button" role="tab" aria-selected={mode === 'form'} className={mode === 'form' ? 'active' : ''} onClick={() => setMode('form')}>Fill in form</button>
+          <button type="button" role="tab" aria-selected={mode === 'text'} className={mode === 'text' ? 'active' : ''} onClick={() => setMode('text')}>Describe it</button>
         </div>
-        <form className="quick-compose" onSubmit={send}>
-          <textarea aria-label="Describe a feature" placeholder="Describe a feature, or paste several lines…" value={text} onChange={(event) => setText(event.target.value)} rows={2} />
-          <button className="btn pri" type="submit" disabled={!text.trim() || sending}>Send</button>
-        </form>
+        {mode === 'form' ? <DirectEntryForm rows={rows} onAdd={onAdd} /> : (
+          <>
+            {aiAvailable && <label className="smart-toggle"><input type="checkbox" checked={smartParse} onChange={(event) => setSmartParse(event.target.checked)} /> Smart parse</label>}
+            <div className="quick-messages" ref={scrollRef}>
+              <div className="chat-tip">Try “Dark mode for the patient app, Dr Rao from Sunrise Clinic, needed by 5 Nov, urgent. It is on staging and in testing.”</div>
+              {messages.map((message) => <div className="chat-user" key={message.id}>{message.text}</div>)}
+              {usedBasic && <p className="basic-note">Used basic parsing.</p>}
+              {sending && <p className="chat-thinking">Parsing your feature…</p>}
+              {drafts.map((item) => (
+                <DraftCard key={item.id} item={item} today={today} onChange={updateDraft}
+                  onAdd={(draft) => add(draft, item.id)} saving={savingId === item.id} />
+              ))}
+            </div>
+            <form className="quick-compose" onSubmit={send}>
+              <textarea aria-label="Describe a feature" placeholder="Describe a feature, or paste several lines…" value={text} onChange={(event) => setText(event.target.value)} rows={2} />
+              <button className="btn pri" type="submit" disabled={!text.trim() || sending}>Send</button>
+            </form>
+          </>
+        )}
       </aside>
     </div>
   )
